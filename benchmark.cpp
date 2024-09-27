@@ -6,6 +6,7 @@
 #include <random>
 #include <ranges>
 
+#include "bytell_hash_map.h"
 #include "sequential_hashmap.h"
 
 template <typename HT>
@@ -31,8 +32,9 @@ static void bm_insert(benchmark::State& state) {
 template <typename HT>
 static void bm_access(benchmark::State& state) {
   size_t values = state.range(0);
-  std::default_random_engine e1(0);
-  std::uniform_int_distribution<size_t> uniform_dist(0, 1000000);
+  std::default_random_engine e1(12);
+  std::uniform_int_distribution<size_t> uniform_dist(
+      0, std::numeric_limits<size_t>::max());
   std::vector<size_t> v(values);
   std::ranges::generate(v, [&]() { return uniform_dist(e1); });
   HT map{};
@@ -44,9 +46,12 @@ static void bm_access(benchmark::State& state) {
   }
 }
 
-BENCHMARK(bm_insert<sequential_hashmap<size_t, size_t>>)->Arg(1000);
-BENCHMARK(bm_insert<std::unordered_map<size_t, size_t>>)->Arg(1000);
+BENCHMARK(bm_insert<sequential_hashmap<size_t, size_t>>)->Arg(1000000);
+BENCHMARK(bm_insert<std::unordered_map<size_t, size_t>>)->Arg(1000000);
+BENCHMARK(bm_insert<ska::bytell_hash_map<size_t, size_t>>)->Arg(1000000);
 
-BENCHMARK(bm_access<sequential_hashmap<size_t, size_t>>)->Arg(1000);
-BENCHMARK(bm_access<std::unordered_map<size_t, size_t>>)->Arg(1000);
+BENCHMARK(bm_access<sequential_hashmap<size_t, size_t>>)->Arg(1000000);
+BENCHMARK(bm_access<std::unordered_map<size_t, size_t>>)->Arg(1000000);
+BENCHMARK(bm_access<ska::bytell_hash_map<size_t, size_t>>)->Arg(1000000);
+
 BENCHMARK_MAIN();
