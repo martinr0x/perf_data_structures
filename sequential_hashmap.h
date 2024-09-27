@@ -22,8 +22,8 @@ class sequential_hashmap {
     bool empty = true;
   };
 
-  size_t entries_;
   size_t size_;
+  size_t max_size_;
   size_t capacity_;
   double load_factor_;
 
@@ -31,21 +31,19 @@ class sequential_hashmap {
 
   [[nodiscard]] size_t compute_capacity() const {
     return static_cast<size_t>(
-        std::lround(load_factor_ * static_cast<double>(size_)));
+        std::lround(load_factor_ * static_cast<double>(max_size_)));
   }
   [[nodiscard]] size_t compute_hash_index(const key_type& key) const {
-    return hash_func{}(key) % size_;
+    return hash_func{}(key) & (max_size_ - 1);
   }
 
   struct Iterator {
+    //todo: expose pair and not struct
     using iterator_category = std::forward_iterator_tag;
     using value_type = Entry;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
     using reference = value_type&;
-
-    size_t index_;
-    std::span<Entry> entry_;
 
     explicit Iterator(std::span<Entry> entry) : index_{0}, entry_{entry} {
       if (!entry.empty()) {
@@ -82,47 +80,51 @@ class sequential_hashmap {
 
     reference operator*() { return entry_[index_]; }
     pointer operator->() { return &entry_[index_]; }
+
+   private:
+    size_t index_;
+    std::span<Entry> entry_;
   };
 
  public:
   explicit sequential_hashmap(const size_t size = 16,
-                              const double load_factor = 0.9)
-      : entries_{},
-        size_{size},
+                              const double load_factor = 0.7)
+      : size_{},
+        max_size_{size},
         load_factor_{load_factor},
-        table_(std::make_unique<Entry[]>(size_)) {
+        table_(std::make_unique<Entry[]>(max_size_)) {
     capacity_ = compute_capacity();
   }
 
   sequential_hashmap(sequential_hashmap&& other) noexcept
-      : entries_{other.entries_},
-        size_{other.size_},
+      : size_{other.size_},
+        max_size_{other.max_size_},
         capacity_{other.capacity_},
         load_factor_{other.load_factor_},
         table_{std::move(other.table_)} {
-    entries_ = other.entries_;
     size_ = other.size_;
+    max_size_ = other.max_size_;
     capacity_ = other.capacity_;
     load_factor_ = other.load_factor_;
     table_ = std::move(other.table_);
   }
 
   sequential_hashmap& operator=(sequential_hashmap&& other) noexcept {
-    entries_ = other.entries_;
     size_ = other.size_;
+    max_size_ = other.max_size_;
     capacity_ = other.capacity_;
     load_factor_ = other.load_factor_;
     table_ = std::move(other.table_);
-    other.entries_ = 0;
     other.size_ = 0;
+    other.max_size_ = 0;
     other.capacity_ = 0;
     other.load_factor_ = 0.0;
     return *this;
   }
 
   sequential_hashmap(const sequential_hashmap& other)
-      : entries_{other.entries_},
-        size_{other.size_},
+      : size_{other.size_},
+        max_size_{other.max_size_},
         capacity_{other.capacity_},
         load_factor_{other.load_factor_},
         table_{std::make_unique<Entry[]>(capacity_)} {
@@ -130,8 +132,8 @@ class sequential_hashmap {
   }
   ~sequential_hashmap() = default;
   sequential_hashmap& operator=(const sequential_hashmap& other) {
-    entries_ = other.entries_;
     size_ = other.size_;
+    max_size_ = other.max_size_;
     capacity_ = other.capacity_;
     load_factor_ = other.load_factor_;
     table_ = std::make_unique<Entry[]>(capacity_);
@@ -140,7 +142,7 @@ class sequential_hashmap {
   }
 
   void grow() {
-    if (size_ / 2 >= std::numeric_limits<size_t>::max()) {
+    if (max_size_ / 2 >= std::numeric_limits<size_t>::max()) {
       throw std::invalid_argument("SequentialHashmap resizing failed");
     }
     //todo: iterate less hacky.
@@ -148,50 +150,51 @@ class sequential_hashmap {
     auto it_end{end()};
     auto old_table = std::move(table_);
 
-    size_ *= 2;
-    table_ = std::make_unique<Entry[]>(size_);
+    max_size_ *= 2;
+    table_ = std::make_unique<Entry[]>(max_size_);
     capacity_ = compute_capacity();
-    entries_ = 0;
+    size_ = 0;
 
     for (auto it{it_begin}; it != it_end; ++it) {
       auto& [key, value, empty] = *it;
       insert(key, value);
     }
   }
+  void emplace(const KeyType& key, const value_type& value) {
+    insert(key, value);
+  }
   void insert(const KeyType& key, const value_type& value) {
-    if (entries_ >= capacity_) {
+    if (size_ >= capacity_) {
       grow();
     }
 
-    const size_t index = compute_hash_index(key);
-    size_t dynamic_index{index};
-    while (!table_[dynamic_index].empty && table_[dynamic_index].key != key &&
-           index - 1 % size_ != dynamic_index) {
-      dynamic_index = (dynamic_index + 1) % size_;
+    size_t index = compute_hash_index(key);
+    while (!table_[index].empty && table_[index].key != key) {
+      index = (index + 1) % max_size_;
     }
 
-    if (table_[dynamic_index].empty) {
-      ++entries_;
+    if (table_[index].empty) {
+      ++size_;
     }
-    table_[dynamic_index].key = key;
-    table_[dynamic_index].value = value;
-    table_[dynamic_index].empty = false;
+    table_[index].key = key;
+    table_[index].value = value;
+    table_[index].empty = false;
   }
 
-  Iterator begin() { return Iterator(std::span<Entry>{table_.get(), size_}); }
+  Iterator begin() {
+    return Iterator(std::span<Entry>{table_.get(), max_size_});
+  }
   Iterator end() { return Iterator(std::span<Entry>{}); }
 
   Iterator find(const key_type& key) {
-    const size_t old_index{compute_hash_index(key)};
-    size_t index{old_index};
-
-    while (!table_[index].empty && table_[index].key != key &&
-           (old_index - 1 % size_) != index) {
-      index = index + 1 % size_;
+    size_t index{compute_hash_index(key)};
+    while (!table_[index].empty && table_[index].key != key) {
+      index = index + 1 & (max_size_ - 1);
     }
+
     return !table_[index].empty && table_[index].key == key
-               ? Iterator(table_.get(), index, size_)
-               : Iterator(nullptr, size_t{}, size_);
+               ? Iterator({table_.get() + index, max_size_ - index})
+               : end();
   }
 
   bool contains(const key_type& key) { return find(key) != end(); }
@@ -201,7 +204,7 @@ class sequential_hashmap {
     if (kv == end()) {
       throw std::out_of_range("Key not found");
     }
-    return kv.value;
+    return kv->value;
   }
 
   void erase(const key_type& key) {
@@ -210,18 +213,21 @@ class sequential_hashmap {
       return;
     }
     kv = Entry{};
-    entries_--;
+
+    size_--;
   };
 
-  void clear() { table_ = std::make_unique<Entry[]>(size_); };
+  void clear() { table_ = std::make_unique<Entry[]>(max_size_); };
 
   value_type& operator[](const key_type& key) {
     Iterator it{find(key)};
     if (it == end()) {
       insert(key, value_type{});
+      return find(key);
     }
-    return find(key);
+    return *it;
   };
+  [[nodiscard]] size_t size() const { return size_; }
 };
 
 #endif  // SEQUENTIALHASHMAP_H
