@@ -1,9 +1,9 @@
 #include <iostream>
 
-#include "SequentialHashmap.h"
+#include "sequential_hashmap.h"
 
 int main() {
-    SequentialHashmap<int, int> map;
+    sequential_hashmap<int, int> map;
     for (int i = 0; i < 100; i++) {
         map.insert(i, i);
     }
