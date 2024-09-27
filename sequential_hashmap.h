@@ -128,7 +128,7 @@ class sequential_hashmap {
         table_{std::make_unique<Entry[]>(capacity_)} {
     std::copy(other.table_.begin(), other.table_.end(), table_.get());
   }
-
+  ~sequential_hashmap() = default;
   sequential_hashmap& operator=(const sequential_hashmap& other) {
     entries_ = other.entries_;
     size_ = other.size_;
@@ -209,19 +209,18 @@ class sequential_hashmap {
     if (kv == end()) {
       return;
     }
-    kv.empty = true;
+    kv = Entry{};
     entries_--;
   };
 
-  void clear() {
-    for (size_t i = 0; i < size_; ++i) {
-      table_[i].empty = true;
-    }
-  };
+  void clear() { table_ = std::make_unique<Entry[]>(size_); };
 
   value_type& operator[](const key_type& key) {
     Iterator it{find(key)};
-    return it.value;
+    if (it == end()) {
+      insert(key, value_type{});
+    }
+    return find(key);
   };
 };
 

@@ -4,6 +4,7 @@
 
 int main() {
     sequential_hashmap<int, int> map;
+
     for (int i = 0; i < 100; i++) {
         map.insert(i, i);
     }
