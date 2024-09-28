@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD 20)
 find_package(benchmark REQUIRED)
 
 add_executable(parallel_hash_map benchmark.cpp
-        sequential_hashmap.cpp
         sequential_hashmap.h
         bytell_hash_map.h
         flat_hash_map.h

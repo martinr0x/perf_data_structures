@@ -24,7 +24,7 @@ namespace details {
 }
 [[nodiscard]] inline bool should_grow(const size_t capacity,
                                       const size_t size) {
-  return size > capacity && capacity < std::numeric_limits<size_t>::max() / 2;
+  return size >= capacity && capacity < std::numeric_limits<size_t>::max() / 2;
 }
 template <typename KeyType, typename ValueType,
           typename HashFunc = std::hash<KeyType>>
@@ -37,6 +37,7 @@ class sequential_hashmap {
   struct Node {
     key_type key;
     value_type value;
+    //todo: get rid of bool flag
     bool empty = true;
   };
 
