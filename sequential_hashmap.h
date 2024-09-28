@@ -26,8 +26,7 @@ namespace details {
                                       const size_t size) {
   return size >= capacity && capacity < std::numeric_limits<size_t>::max() / 2;
 }
-template <typename KeyType, typename ValueType,
-          typename HashFunc = std::hash<KeyType>>
+template <typename KeyType, typename ValueType, typename HashFunc>
 class sequential_hashmap {
 
   using key_type = KeyType;
@@ -251,8 +250,8 @@ class sequential_hashmap {
 };
 }  // namespace details
 
-template <typename Key, typename Value>
-using sequential = details::sequential_hashmap<Key, Value>;
+template <typename Key, typename Value, typename HashFunc = std::hash<Key>>
+using sequential = details::sequential_hashmap<Key, Value, HashFunc>;
 }  // namespace hashmap
 
 #endif  // SEQUENTIALHASHMAP_H
