@@ -9,6 +9,16 @@
 #include "bytell_hash_map.h"
 #include "sequential_hashmap.h"
 
+std::vector<size_t> generate_random_sequence(size_t n) {
+  std::vector<size_t> seq(n);
+  std::default_random_engine engine(0);
+  std::uniform_int_distribution<size_t> uniform_dist(
+      0, std::numeric_limits<size_t>::max());
+  std::iota(seq.begin(), seq.end(), 0);
+  std::ranges::generate(seq, [&]() { return uniform_dist(engine); });
+  return seq;
+}
+
 template <typename HT>
 void fill_map_random(HT& map, const std::vector<size_t>& sequence) {
   for (const size_t i :
@@ -18,31 +28,26 @@ void fill_map_random(HT& map, const std::vector<size_t>& sequence) {
 }
 template <typename HT>
 static void bm_insert(benchmark::State& state) {
-  size_t values = state.range(0);
-  std::default_random_engine e1(0);
-  std::uniform_int_distribution<size_t> uniform_dist(0, 1000000);
-  std::vector<size_t> v(values);
-  std::ranges::generate(v, [&]() { return uniform_dist(e1); });
+  const size_t num_values = state.range(0);
+  auto v{generate_random_sequence(num_values)};
   for (auto _ : state) {
     HT map{};
     fill_map_random(map, v);
+    benchmark::DoNotOptimize(map);
   }
 }
 
 template <typename HT>
 static void bm_access(benchmark::State& state) {
-  size_t values = state.range(0);
-  std::default_random_engine e1(12);
-  std::uniform_int_distribution<size_t> uniform_dist(
-      0, std::numeric_limits<size_t>::max());
-  std::vector<size_t> v(values);
-  std::ranges::generate(v, [&]() { return uniform_dist(e1); });
+  const size_t num_values = state.range(0);
+  auto v{generate_random_sequence(num_values)};
   HT map{};
   fill_map_random(map, v);
   for (auto _ : state) {
     for (auto& val : v) {
       map.at(val);
     }
+    benchmark::DoNotOptimize(map);
   }
 }
 
