@@ -200,6 +200,7 @@ class sequential_hashmap {
   Iterator begin() {
     return Iterator(std::span<Node>{table_.get(), max_size_});
   }
+  //todo: perf problem, fix
   Iterator end() { return Iterator(std::span<Node>{}); }
 
   Iterator find(const key_type& key) {
