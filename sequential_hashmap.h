@@ -9,14 +9,32 @@
 #include <iostream>
 #include <memory>
 #include <span>
+namespace hashmap {
 
+namespace details {
+[[nodiscard]] inline size_t compute_capacity(const double load_factor,
+                                             const size_t max_size) {
+  return static_cast<size_t>(
+      std::lround(load_factor * static_cast<double>(max_size)));
+}
+
+[[nodiscard]] inline bool should_shrink(const size_t capacity,
+                                        const size_t size) {
+  return capacity > 0 && size / 2 < capacity;
+}
+[[nodiscard]] inline bool should_grow(const size_t capacity,
+                                      const size_t size) {
+  return size > capacity && capacity < std::numeric_limits<size_t>::max() / 2;
+}
 template <typename KeyType, typename ValueType,
           typename HashFunc = std::hash<KeyType>>
 class sequential_hashmap {
+
   using key_type = KeyType;
   using value_type = ValueType;
   using hash_func = HashFunc;
-  struct Entry {
+
+  struct Node {
     key_type key;
     value_type value;
     bool empty = true;
@@ -26,13 +44,8 @@ class sequential_hashmap {
   size_t max_size_;
   size_t capacity_;
   double load_factor_;
+  std::unique_ptr<Node[]> table_;
 
-  std::unique_ptr<Entry[]> table_;
-
-  [[nodiscard]] size_t compute_capacity() const {
-    return static_cast<size_t>(
-        std::lround(load_factor_ * static_cast<double>(max_size_)));
-  }
   [[nodiscard]] size_t compute_hash_index(const key_type& key) const {
     return hash_func{}(key) & (max_size_ - 1);
   }
@@ -40,19 +53,19 @@ class sequential_hashmap {
   struct Iterator {
     //todo: expose pair and not struct
     using iterator_category = std::forward_iterator_tag;
-    using value_type = Entry;
+    using value_type = Node;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
     using reference = value_type&;
 
-    explicit Iterator(std::span<Entry> entry) : index_{0}, entry_{entry} {
+    explicit Iterator(std::span<Node> entry) : index_{0}, entry_{entry} {
       if (!entry.empty()) {
         return;
       }
       while (entry_.size() > index_ && entry_[index_].empty)
         ++index_;
       if (index_ >= entry_.size()) {
-        entry_ = std::span<Entry>{};
+        entry_ = std::span<Node>{};
       }
     }
 
@@ -62,7 +75,7 @@ class sequential_hashmap {
       while (entry_.size() > index_ && entry_[index_].empty)
         ++index_;
       if (index_ >= entry_.size()) {
-        entry_ = std::span<Entry>{};
+        entry_ = std::span<Node>{};
       }
 
       return *this;
@@ -83,18 +96,17 @@ class sequential_hashmap {
 
    private:
     size_t index_;
-    std::span<Entry> entry_;
+    std::span<Node> entry_;
   };
 
  public:
-  explicit sequential_hashmap(const size_t size = 16,
+  explicit sequential_hashmap(const size_t start_size = 16,
                               const double load_factor = 0.7)
       : size_{},
-        max_size_{size},
+        max_size_{start_size},
         load_factor_{load_factor},
-        table_(std::make_unique<Entry[]>(max_size_)) {
-    capacity_ = compute_capacity();
-  }
+        table_(std::make_unique<Node[]>(max_size_)),
+        capacity_{compute_capacity(load_factor, start_size)} {}
 
   sequential_hashmap(sequential_hashmap&& other) noexcept
       : size_{other.size_},
@@ -127,32 +139,31 @@ class sequential_hashmap {
         max_size_{other.max_size_},
         capacity_{other.capacity_},
         load_factor_{other.load_factor_},
-        table_{std::make_unique<Entry[]>(capacity_)} {
+        table_{std::make_unique<Node[]>(capacity_)} {
     std::copy(other.table_.begin(), other.table_.end(), table_.get());
   }
-  ~sequential_hashmap() = default;
   sequential_hashmap& operator=(const sequential_hashmap& other) {
     size_ = other.size_;
     max_size_ = other.max_size_;
     capacity_ = other.capacity_;
     load_factor_ = other.load_factor_;
-    table_ = std::make_unique<Entry[]>(capacity_);
+    table_ = std::make_unique<Node[]>(capacity_);
     std::copy(other.table_.begin(), other.table_.end(), table_.get());
     return *this;
   }
 
-  void grow() {
-    if (max_size_ / 2 >= std::numeric_limits<size_t>::max()) {
-      throw std::invalid_argument("SequentialHashmap resizing failed");
-    }
+  ~sequential_hashmap() = default;
+
+  void rehash(const size_t new_max_size) {
+
     //todo: iterate less hacky.
     auto it_begin{begin()};
     auto it_end{end()};
     auto old_table = std::move(table_);
 
-    max_size_ *= 2;
-    table_ = std::make_unique<Entry[]>(max_size_);
-    capacity_ = compute_capacity();
+    max_size_ = new_max_size;
+    table_ = std::make_unique<Node[]>(max_size_);
+    capacity_ = compute_capacity(load_factor_, max_size_);
     size_ = 0;
 
     for (auto it{it_begin}; it != it_end; ++it) {
@@ -160,15 +171,19 @@ class sequential_hashmap {
       insert(key, value);
     }
   }
+  //todo: variadic emplace
   void emplace(const KeyType& key, const value_type& value) {
     insert(key, value);
   }
   void insert(const KeyType& key, const value_type& value) {
+    if (should_grow(capacity_, size_)) {
+      rehash(2 * max_size_);
+    }
     if (size_ >= capacity_) {
-      grow();
+      throw std::out_of_range("sequential_hashmap: capacity exceeded");
     }
 
-    size_t index = compute_hash_index(key);
+    size_t index{compute_hash_index(key)};
     while (!table_[index].empty && table_[index].key != key) {
       index = (index + 1) % max_size_;
     }
@@ -182,9 +197,9 @@ class sequential_hashmap {
   }
 
   Iterator begin() {
-    return Iterator(std::span<Entry>{table_.get(), max_size_});
+    return Iterator(std::span<Node>{table_.get(), max_size_});
   }
-  Iterator end() { return Iterator(std::span<Entry>{}); }
+  Iterator end() { return Iterator(std::span<Node>{}); }
 
   Iterator find(const key_type& key) {
     size_t index{compute_hash_index(key)};
@@ -212,12 +227,15 @@ class sequential_hashmap {
     if (kv == end()) {
       return;
     }
-    kv = Entry{};
-
+    *kv = Node{};
     size_--;
+
+    if (should_shrink(capacity_, size_)) {
+      rehash(max_size_ / 2);
+    }
   };
 
-  void clear() { table_ = std::make_unique<Entry[]>(max_size_); };
+  void clear() { table_ = std::make_unique<Node[]>(max_size_); };
 
   value_type& operator[](const key_type& key) {
     Iterator it{find(key)};
@@ -229,5 +247,10 @@ class sequential_hashmap {
   };
   [[nodiscard]] size_t size() const { return size_; }
 };
+}  // namespace details
+
+template <typename Key, typename Value>
+using sequential = details::sequential_hashmap<Key, Value>;
+}  // namespace hashmap
 
 #endif  // SEQUENTIALHASHMAP_H

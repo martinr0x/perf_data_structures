@@ -51,11 +51,11 @@ static void bm_access(benchmark::State& state) {
   }
 }
 
-BENCHMARK(bm_insert<sequential_hashmap<size_t, size_t>>)->Arg(1000000);
+BENCHMARK(bm_insert<hashmap::sequential<size_t, size_t>>)->Arg(1000000);
 BENCHMARK(bm_insert<std::unordered_map<size_t, size_t>>)->Arg(1000000);
 BENCHMARK(bm_insert<ska::bytell_hash_map<size_t, size_t>>)->Arg(1000000);
 
-BENCHMARK(bm_access<sequential_hashmap<size_t, size_t>>)->Arg(1000000);
+BENCHMARK(bm_access<hashmap::sequential<size_t, size_t>>)->Arg(1000000);
 BENCHMARK(bm_access<std::unordered_map<size_t, size_t>>)->Arg(1000000);
 BENCHMARK(bm_access<ska::bytell_hash_map<size_t, size_t>>)->Arg(1000000);
 
