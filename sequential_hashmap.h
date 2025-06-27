@@ -85,9 +85,9 @@ class sequential_hashmap {
       ++*this;
       return tmp;
     }
-    bool operator!=(Iterator& other) { return !(*this == other); }
+    bool operator!=(const Iterator& other) { return !(*this == other); }
 
-    bool operator==(Iterator& other) {
+    bool operator==(const Iterator& other) {
       return entry_.data() == other.entry_.data();
     }
 
@@ -216,7 +216,7 @@ class sequential_hashmap {
   bool contains(const key_type& key) { return find(key) != end(); }
 
   value_type& at(const key_type& key) {
-    Iterator kv{find(key)};
+    auto kv{find(key)};
     if (kv == end()) {
       throw std::out_of_range("Key not found");
     }

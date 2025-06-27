@@ -1,0 +1,77 @@
+#include <cstddef>
+#include <iostream>
+#include <ostream>
+#include <vector>
+
+//write index, read index
+//circular buffer
+// put:
+//  increase write
+//  write data
+// get:
+//  increase read
+//  read data
+template <typename T>
+class parallel_queue {
+ private:
+  std::size_t size{};
+  std::size_t read_idx{};
+  std::size_t write_idx{};
+  struct Node {
+    T val;
+    bool empty = true;
+  };
+
+  std::vector<Node> _data;
+
+  size_t calc_space(size_t read, size_t write) {
+    if (read == write)
+      return size;
+    if (read > write) {
+      return read - 1 - write;
+    }
+    return size - write - 1;
+  }
+
+ public:
+  parallel_queue(size_t size = 100000) : size{size}, _data(size, Node{}) {}
+
+  bool try_put(const T& value) {
+    Node desired{value, false};
+    for (size_t i{0}; i < size; i++) {
+      std::size_t curr_write_idx{(write_idx + i) % size};
+      std::atomic_ref<Node> ref{_data[curr_write_idx]};
+      auto expected{ref.load()};
+
+      if (expected.empty) {
+        // std::cout << std::format("attempt to write at idx {}\n",
+        //                          curr_write_idx);
+
+        if (ref.compare_exchange_strong(expected, desired)) {
+          write_idx = curr_write_idx + 1;
+          return true;
+        }
+      }
+    }
+    // std::cout << "queue is full or unlucky \n";
+    return false;
+  }
+  std::optional<T> try_get() {
+    Node node{};
+    for (size_t i{0}; i < size; i++) {
+      std::size_t curr_read_idx{(read_idx + i) % size};
+      std::atomic_ref<Node> ref{_data[curr_read_idx]};
+      auto expected{ref.load()};
+
+      if (!expected.empty) {
+        // std::cout << std::format("attempt to read at idx {}\n", curr_read_idx);
+        if (ref.compare_exchange_strong(expected, node)) {
+          read_idx = curr_read_idx + 1;
+          return {expected.val};
+        }
+      }
+    }
+
+    return std::nullopt;
+  }
+};
