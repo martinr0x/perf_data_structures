@@ -2,26 +2,25 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
-#include "parallel_queue.h"
 #include "locking_queue_circular_buffer.h"
+#include "locking_queue_shared_mutex.h"
+#include "parallel_queue.h"
 template <typename T>
 class QueueTest : public ::testing::Test {
-protected:
-    std::unique_ptr<T> queue;
-    void SetUp() override {
-        queue = std::make_unique<T>(2000);
-    }
-
-
+ protected:
+  std::unique_ptr<T> queue;
+  void SetUp() override { queue = std::make_unique<T>(2000); }
 };
 
-using QueueTypes = ::testing::Types<parallel_queue<int>, locking_queue_with_circular_buffer<int>>;
+using QueueTypes =
+    ::testing::Types<parallel_queue<int>, locking_queue_with_shared_mutex<int>,
+                     locking_queue_with_circular_buffer<int>>;
 
 TYPED_TEST_SUITE(QueueTest, QueueTypes);
 
-TYPED_TEST(QueueTest, one_producer_one_consumer) {
+TYPED_TEST(QueueTest, two_producer_one_consumer) {
   const int N = 1000;
-  auto & q= *this->queue;
+  auto& q = *this->queue;
   std::vector<int> data1, data2;
   for (int i = 0; i < N; ++i) {
     data1.push_back(i);
@@ -48,29 +47,28 @@ TYPED_TEST(QueueTest, one_producer_one_consumer) {
 
   t1.join();
   t2.join();
-
+  std::size_t tries = 10;
   // Remove from one thread
   std::unordered_set<int> removed;
-  while (removed.size() < 2 * N) {
+  while (removed.size() <= 2 * N && tries > 0) {
     auto val{q.try_get()};
     if (val.has_value()) {
       removed.insert(val.value());
     } else {
-      std::this_thread::yield();
+      tries--;
     }
   }
-
   // Verify all expected values were removed
   for (int x : data1) {
-    assert(removed.count(x) == 1);
+    EXPECT_TRUE(removed.count(x) == 1);
   }
   for (int x : data2) {
-    assert(removed.count(x) == 1);
+    EXPECT_TRUE(removed.count(x) == 1);
   }
 }
 TYPED_TEST(QueueTest, two_producers_two_consumers) {
   const int N = 1000;
-  auto & q = *this->queue;
+  auto& q = *this->queue;
   std::vector<int> data1, data2;
   for (int i = 0; i < N; ++i) {
     data1.push_back(i);

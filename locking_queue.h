@@ -5,15 +5,11 @@
 template <typename T>
 class locking_queue {
  private:
-  std::size_t size{};
-  std::size_t read_idx{};
-  std::size_t write_idx{};
-
   std::queue<T> _data;
   std::mutex mutex;
 
  public:
-  locking_queue(size_t size = 100000) {}
+  locking_queue([[maybe_unused]] size_t size) {}
 
   bool try_put(const T& value) {
     std::unique_lock<std::mutex> lock(mutex);
