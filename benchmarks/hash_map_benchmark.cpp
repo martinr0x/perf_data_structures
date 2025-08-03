@@ -6,8 +6,8 @@
 #include <random>
 #include <ranges>
 
-#include "bytell_hash_map.h"
-#include "sequential_hashmap.h"
+#include "hash_maps/bytell_hash_map.h"
+#include "hash_maps/sequential_hashmap.h"
 
 std::vector<size_t> generate_random_sequence(size_t n) {
   std::vector<size_t> seq(n);

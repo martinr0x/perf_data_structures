@@ -2,9 +2,9 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
-#include "locking_queue_circular_buffer.h"
-#include "locking_queue_shared_mutex.h"
-#include "parallel_queue.h"
+#include "queues/locking_queue_circular_buffer.h"
+#include "queues/locking_queue_shared_mutex.h"
+#include "queues/parallel_queue.h"
 template <typename T>
 class QueueTest : public ::testing::Test {
  protected:

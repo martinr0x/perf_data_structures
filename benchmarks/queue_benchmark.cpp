@@ -2,12 +2,12 @@
 #include <optional>
 #include <thread>
 
-#include "concurrentqueue.h"
-#include "locking_queue.h"
-#include "locking_queue_circular_buffer.h"
-#include "locking_queue_shared_mutex.h"
+#include "queues/concurrentqueue.h"
+#include "queues/locking_queue.h"
+#include "queues/locking_queue_circular_buffer.h"
+#include "queues/locking_queue_shared_mutex.h"
 
-#include "parallel_queue.h"
+#include "queues/parallel_queue.h"
 
 
 static void BM_SPSC(benchmark::State& state) {
