@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include "queues/locking_queue_circular_buffer.h"
 #include "queues/locking_queue_shared_mutex.h"
-#include "queues/parallel_queue.h"
+#include "queues/lockfree_queue.h"
 template <typename T>
 class QueueTest : public ::testing::Test {
  protected:
@@ -13,7 +13,7 @@ class QueueTest : public ::testing::Test {
 };
 
 using QueueTypes =
-    ::testing::Types<parallel_queue<int>, locking_queue_with_shared_mutex<int>,
+    ::testing::Types<lockfree_queue<int>, locking_queue_with_shared_mutex<int>,
                      locking_queue_with_circular_buffer<int>>;
 
 TYPED_TEST_SUITE(QueueTest, QueueTypes);

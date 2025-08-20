@@ -12,7 +12,7 @@
 //  increase read
 //  read data
 template <typename T>
-class parallel_queue {
+class lockfree_queue {
  private:
   std::size_t size{};
   std::size_t read_idx{};
@@ -34,7 +34,7 @@ class parallel_queue {
   }
 
  public:
-  parallel_queue(size_t size = 100000) : size{size}, _data(size, Node{}) {}
+  lockfree_queue(size_t size = 100000) : size{size}, _data(size, Node{}) {}
 
   bool try_put(const T& value) {
     Node desired{value, false};

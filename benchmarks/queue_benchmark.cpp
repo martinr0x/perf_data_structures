@@ -7,11 +7,11 @@
 #include "queues/locking_queue_circular_buffer.h"
 #include "queues/locking_queue_shared_mutex.h"
 
-#include "queues/parallel_queue.h"
+#include "queues/lockfree_queue.h"
 
 
-static void BM_SPSC(benchmark::State& state) {
-  parallel_queue<int> q;
+static void bm_queue_queue_spsc(benchmark::State& state) {
+  lockfree_queue<int> q;
   const int N = state.range(0);
 
   for (auto _ : state) {
@@ -41,7 +41,7 @@ static void BM_SPSC(benchmark::State& state) {
   }
 }
 template <typename QUEUE>
-static void BM_MPMC(benchmark::State& state) {
+static void bm_queue_mpmc(benchmark::State& state) {
   const int N = state.range(0);              // Number of items per producer
   const int num_producers = state.range(1);  // Number of producer threads
   const int num_consumers = state.range(2);  // Number of consumer threads
@@ -112,36 +112,35 @@ struct moodycamel_wrapper {
 
 // Register benchmarks
 // Args: N, num_producers, num_consumers
-BENCHMARK(BM_MPMC<parallel_queue<int>>)
+BENCHMARK(bm_queue_mpmc<lockfree_queue<int>>)
     ->ArgsProduct({
         {100000},             // N
         {1},                  // producers
         {1, 2, 4, 8, 16, 24}  // consumers
     });
-BENCHMARK(BM_MPMC<moodycamel_wrapper<int>>)
+BENCHMARK(bm_queue_mpmc<moodycamel_wrapper<int>>)
     ->ArgsProduct({
         {100000},             // N
         {1},                  // producers
         {1, 2, 4, 8, 16, 24}  // consumers
     });
-BENCHMARK(BM_MPMC<locking_queue<int>>)
+BENCHMARK(bm_queue_mpmc<locking_queue<int>>)
     ->ArgsProduct({
         {100000},             // N
         {1},                  // producers
         {1, 2, 4, 8, 16, 24}  // consumers
     });
-BENCHMARK(BM_MPMC<locking_queue_with_circular_buffer<int>>)
+BENCHMARK(bm_queue_mpmc<locking_queue_with_circular_buffer<int>>)
     ->ArgsProduct({
         {100000},             // N
         {1},                  // producers
         {1, 2, 4, 8, 16, 24}  // consumers
     });
-BENCHMARK(BM_MPMC<locking_queue_with_shared_mutex<int>>)
+BENCHMARK(bm_queue_mpmc<locking_queue_with_shared_mutex<int>>)
     ->ArgsProduct({
         {100000},             // N
         {1},                  // producers
         {1, 2, 4, 8, 16, 24}  // consumers
     });
-BENCHMARK(BM_SPSC)->Arg(1000000);
-;
+BENCHMARK(bm_queue_queue_spsc)->Arg(1000000);
 
