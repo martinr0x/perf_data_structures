@@ -2,7 +2,7 @@
 #include <iostream>
 #include <ostream>
 #include <vector>
-
+#include <atomic>
 //write index, read index
 //circular buffer
 // put:
