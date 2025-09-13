@@ -6,7 +6,7 @@ Occasionally running some benchmarks against some proven solutions to see how we
 ## Queues
 Implemented 4 different concurrent queues:
 * locking_queue: Unique lock for reading and writing
-* locking_queue_with_shared_mutex: RW lock + atomic read counter
+* locking_queue_shared_mutex: RW lock + atomic read counter
 * lockfree_queue: Using scanning approach + CAS. Works only for small data types
 * lockfree_queue_fixed: Poor naming, uses atomic read/write counter + slot sequencing
 * moodycamel: Fast lockfree queue just used for comparison
@@ -16,8 +16,8 @@ Ran on my 12-core Apple M4 PRO (ARM)
 
 #### Single Producer Multiple Consumer
 ![alt text](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/spmc_results.png?raw=true)
-* Locking queue is so fast because its not fixed size, so inserts usually fit in L1 cache.
-
+* locking_queue is so fast because its not fixed size, so inserts usually fit in L1 cache.
+* locking_queue_shared_mutex super slow because writer starves due to unique lock access, readers rarely give up shared lock
 #### Multiple Producer Single Consumer
 ![alt text](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/mpsc_results.png?raw=true)
 * Moodycamel is so much faster because it can dynamically grow, and does not wait until consumer took values from the queue.
