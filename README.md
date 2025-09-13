@@ -16,12 +16,12 @@ Ran on my 12-core Apple M4 PRO (ARM)
 
 Single Producer Multiple Consumer
 ![alt text](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/spmc_results.png?raw=true)
-Locking queue is so fast because its not fixed size, so inserts usually fit in L1 cache.
+* Locking queue is so fast because its not fixed size, so inserts usually fit in L1 cache.
 
 Multiple Producer Single Consumer
 ![alt text](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/mpsc_results.png?raw=true)
-Moodycamel is so much faster because it can dynamically grow, and does not wait until consumer took values from the queue.
-Same for locking_queue
+* Moodycamel is so much faster because it can dynamically grow, and does not wait until consumer took values from the queue.
+* Same for locking_queue
 
 ### Future work
 * Dynamically growing lookfree queue
