@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import re
 
 # Raw benchmark data
-data_mpsc = """
+data = """
 bm_queue_mpmc<lockfree_queue<int>>/100000/1/1                         7.37 ms        0.041 ms         1000
 bm_queue_mpmc<lockfree_queue<int>>/100000/2/1                         20.4 ms        0.048 ms         1000
 bm_queue_mpmc<lockfree_queue<int>>/100000/4/1                         61.4 ms        0.072 ms          100
@@ -71,11 +71,11 @@ bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/24       1097 ms   
 # Parse the data
 benchmarks = {}
 for line in data.strip().splitlines():
-    match = re.match(r'bm_queue_mpmc<(.+?)>/\d+/\d+/(\d+)\s+([\d.]+) ms', line)
+    match = re.match(r'bm_queue_mpmc<(.+?)>/\d+/(\d+)/(\d+)\s+([\d.]+) ms', line)
     if match:
         queue_type = match.group(1)
-        threads = int(match.group(2))
-        time_ms = float(match.group(3))
+        threads = max(int(match.group(2)), int(match.group(3)))
+        time_ms = float(match.group(4))
         benchmarks.setdefault(queue_type, []).append((threads, time_ms))
 
 # Plot
@@ -87,7 +87,7 @@ for queue_type, results in benchmarks.items():
 
 plt.xlabel("Number of Threads")
 plt.ylabel("Time (ms)")
-plt.title("Google Benchmark: Queue Performance")
+plt.title("Multiple Producer Single Consumer")
 plt.yscale("log")  # log scale because times vary a lot
 plt.grid(True, which="both", ls="--", linewidth=0.5)
 plt.legend()
