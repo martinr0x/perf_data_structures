@@ -208,8 +208,8 @@ TYPED_TEST(QueueTest, stress_randomized_with_timeout_and_spinlimit) {
   watchdog.join();
 
   // Final verification
-  ASSERT_EQ(consumed_count, producers * N);
-  ASSERT_EQ(consumed_values.size(), producers * N);
+  EXPECT_EQ(consumed_count, producers * N);
+  EXPECT_EQ(consumed_values.size(), producers * N);
   for (int i = 0; i < producers * N; i++) {
     ASSERT_TRUE(consumed_values.count(i) == 1);
   }

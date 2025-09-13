@@ -1,279 +1,95 @@
-import json
 import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
 import re
-from pathlib import Path
-import seaborn as sns
 
-class BenchmarkPlotter:
-    def __init__(self, json_file=None):
-        """
-        Initialize the benchmark plotter.
-        
-        Args:
-            json_file: Path to Google Benchmark JSON output file
-        """
-        self.data = None
-        if json_file:
-            self.load_data(json_file)
-    
-    def load_data(self, json_file):
-        """Load benchmark data from JSON file."""
-        with open(json_file, 'r') as f:
-            self.raw_data = json.load(f)
-        
-        # Extract benchmark results
-        benchmarks = []
-        for bench in self.raw_data['benchmarks']:
-            # Skip aggregate results (mean, median, stddev)
-            if bench.get('aggregate_name'):
-                continue
-                
-            benchmarks.append({
-                'name': bench['name'],
-                'real_time': bench['real_time'],
-                'cpu_time': bench['cpu_time'],
-                'time_unit': bench['time_unit'],
-                'iterations': bench['iterations'],
-                'threads': bench.get('threads', 1),
-                'bytes_per_second': bench.get('bytes_per_second', 0),
-                'items_per_second': bench.get('items_per_second', 0)
-            })
-        
-        self.data = pd.DataFrame(benchmarks)
-        self._parse_benchmark_names()
-    
-    def _parse_benchmark_names(self):
-        """Parse benchmark names to extract implementation and thread count."""
-        parsed_data = []
-        
-        for _, row in self.data.iterrows():
-            name = row['name']
-            
-            # Extract implementation name (everything before the first '/')
-            impl_match = re.match(r'^([^/]+)', name)
-            implementation = impl_match.group(1) if impl_match else 'Unknown'
-            
-            # Extract thread count from name or use threads column
-            thread_match = re.search(r'/threads:(\d+)', name)
-            if thread_match:
-                thread_count = int(thread_match.group(1))
-            else:
-                # Try to extract from patterns like BM_QueueName_8 (8 threads)
-                thread_match = re.search(r'_(\d+)$', name)
-                thread_count = int(thread_match.group(1)) if thread_match else row['threads']
-            
-            # Extract operation type if present
-            operation = 'mixed'
-            if 'enqueue' in name.lower():
-                operation = 'enqueue'
-            elif 'dequeue' in name.lower():
-                operation = 'dequeue'
-            elif 'producer' in name.lower():
-                operation = 'producer'
-            elif 'consumer' in name.lower():
-                operation = 'consumer'
-            
-            parsed_data.append({
-                'implementation': implementation,
-                'threads': thread_count,
-                'operation': operation,
-                'throughput_ops_sec': 1e9 / row['real_time'] if row['real_time'] > 0 else 0,
-                'latency_ns': row['real_time'],
-                'cpu_time_ns': row['cpu_time'],
-                'original_name': name
-            })
-        
-        self.parsed_data = pd.DataFrame(parsed_data)
-    
-    def plot_scalability(self, metric='throughput_ops_sec', figsize=(12, 8), 
-                        operation_filter=None, log_scale=False):
-        """
-        Plot scalability comparison across implementations.
-        
-        Args:
-            metric: 'throughput_ops_sec' or 'latency_ns'
-            figsize: Figure size tuple
-            operation_filter: Filter by operation type ('enqueue', 'dequeue', 'mixed', etc.)
-            log_scale: Use logarithmic scale for y-axis
-        """
-        if self.parsed_data is None:
-            raise ValueError("No data loaded. Call load_data() first.")
-        
-        data = self.parsed_data.copy()
-        
-        if operation_filter:
-            data = data[data['operation'] == operation_filter]
-        
-        plt.figure(figsize=figsize)
-        
-        # Group by implementation and plot
-        for impl in data['implementation'].unique():
-            impl_data = data[data['implementation'] == impl].sort_values('threads')
-            
-            plt.plot(impl_data['threads'], impl_data[metric], 
-                    marker='o', linewidth=2, markersize=6, label=impl)
-        
-        plt.xlabel('Number of Threads')
-        
-        if metric == 'throughput_ops_sec':
-            plt.ylabel('Throughput (Operations/Second)')
-            plt.title(f'Queue Implementation Scalability - Throughput')
-        else:
-            plt.ylabel('Latency (nanoseconds)')
-            plt.title(f'Queue Implementation Scalability - Latency')
-        
-        if log_scale:
-            plt.yscale('log')
-            plt.xscale('log')
-        
-        plt.grid(True, alpha=0.3)
-        plt.legend()
-        plt.tight_layout()
-        return plt.gcf()
-    
-    def plot_heatmap(self, metric='throughput_ops_sec', figsize=(10, 6)):
-        """Create a heatmap showing performance across implementations and thread counts."""
-        if self.parsed_data is None:
-            raise ValueError("No data loaded. Call load_data() first.")
-        
-        # Create pivot table
-        pivot_data = self.parsed_data.pivot_table(
-            values=metric, 
-            index='implementation', 
-            columns='threads',
-            aggfunc='mean'
-        )
-        
-        plt.figure(figsize=figsize)
-        
-        if metric == 'throughput_ops_sec':
-            sns.heatmap(pivot_data, annot=True, fmt='.2e', cmap='YlOrRd')
-            plt.title('Throughput Heatmap (Operations/Second)')
-        else:
-            sns.heatmap(pivot_data, annot=True, fmt='.0f', cmap='YlOrRd_r')
-            plt.title('Latency Heatmap (nanoseconds)')
-        
-        plt.xlabel('Number of Threads')
-        plt.ylabel('Implementation')
-        plt.tight_layout()
-        return plt.gcf()
-    
-    def plot_efficiency(self, figsize=(12, 8)):
-        """Plot parallel efficiency (speedup / thread_count)."""
-        if self.parsed_data is None:
-            raise ValueError("No data loaded. Call load_data() first.")
-        
-        plt.figure(figsize=figsize)
-        
-        for impl in self.parsed_data['implementation'].unique():
-            impl_data = self.parsed_data[self.parsed_data['implementation'] == impl].sort_values('threads')
-            
-            # Calculate speedup relative to single thread performance
-            single_thread_perf = impl_data[impl_data['threads'] == 1]['throughput_ops_sec'].iloc[0] if len(impl_data[impl_data['threads'] == 1]) > 0 else impl_data['throughput_ops_sec'].min()
-            
-            speedup = impl_data['throughput_ops_sec'] / single_thread_perf
-            efficiency = speedup / impl_data['threads']
-            
-            plt.plot(impl_data['threads'], efficiency, 
-                    marker='o', linewidth=2, markersize=6, label=impl)
-        
-        # Add ideal efficiency line
-        max_threads = self.parsed_data['threads'].max()
-        plt.axhline(y=1.0, color='black', linestyle='--', alpha=0.5, label='Ideal Efficiency')
-        
-        plt.xlabel('Number of Threads')
-        plt.ylabel('Parallel Efficiency')
-        plt.title('Parallel Efficiency Comparison')
-        plt.grid(True, alpha=0.3)
-        plt.legend()
-        plt.ylim(0, None)
-        plt.tight_layout()
-        return plt.gcf()
-    
-    def generate_report(self, output_dir='.', save_plots=True):
-        """Generate a comprehensive performance report."""
-        if self.parsed_data is None:
-            raise ValueError("No data loaded. Call load_data() first.")
-        
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
-        
-        print("=== Queue Performance Analysis Report ===\n")
-        
-        # Summary statistics
-        print("Implementations tested:")
-        for impl in self.parsed_data['implementation'].unique():
-            impl_data = self.parsed_data[self.parsed_data['implementation'] == impl]
-            thread_range = f"{impl_data['threads'].min()}-{impl_data['threads'].max()}"
-            max_throughput = impl_data['throughput_ops_sec'].max()
-            print(f"  {impl}: {thread_range} threads, max throughput: {max_throughput:.2e} ops/sec")
-        
-        print(f"\nThread counts tested: {sorted(self.parsed_data['threads'].unique())}")
-        
-        # Generate plots
-        if save_plots:
-            # Throughput scalability
-            fig1 = self.plot_scalability('throughput_ops_sec')
-            fig1.savefig(output_path / 'throughput_scalability.png', dpi=300, bbox_inches='tight')
-            
-            # Latency scalability
-            fig2 = self.plot_scalability('latency_ns')
-            fig2.savefig(output_path / 'latency_scalability.png', dpi=300, bbox_inches='tight')
-            
-            # Efficiency
-            fig3 = self.plot_efficiency()
-            fig3.savefig(output_path / 'parallel_efficiency.png', dpi=300, bbox_inches='tight')
-            
-            # Heatmap
-            fig4 = self.plot_heatmap('throughput_ops_sec')
-            fig4.savefig(output_path / 'throughput_heatmap.png', dpi=300, bbox_inches='tight')
-            
-            print(f"\nPlots saved to {output_path}/")
-            
-            plt.show()
+# Raw benchmark data
+data_mpsc = """
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/1                         7.37 ms        0.041 ms         1000
+bm_queue_mpmc<lockfree_queue<int>>/100000/2/1                         20.4 ms        0.048 ms         1000
+bm_queue_mpmc<lockfree_queue<int>>/100000/4/1                         61.4 ms        0.072 ms          100
+bm_queue_mpmc<lockfree_queue<int>>/100000/8/1                          273 ms        0.136 ms           10
+bm_queue_mpmc<lockfree_queue<int>>/100000/16/1                         649 ms        0.192 ms           10
+bm_queue_mpmc<lockfree_queue<int>>/100000/24/1                        1004 ms        0.266 ms           10
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/1                   2.05 ms        0.133 ms         5526
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/2/1                   12.5 ms        0.136 ms         1000
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/4/1                   59.7 ms        0.167 ms          100
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/8/1                    205 ms        0.222 ms          100
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/16/1                   663 ms        0.280 ms           10
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/24/1                   971 ms        0.337 ms           10
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/1                     7.52 ms        0.060 ms         1000
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/2/1                     11.5 ms        0.068 ms         1000
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/4/1                     37.9 ms        0.135 ms          100
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/8/1                     70.8 ms        0.180 ms          100
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/16/1                     158 ms        0.272 ms          100
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/24/1                     242 ms        0.344 ms          100
+bm_queue_mpmc<locking_queue<int>>/100000/1/1                          1.38 ms        0.029 ms        10000
+bm_queue_mpmc<locking_queue<int>>/100000/2/1                          5.14 ms        0.037 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/4/1                          11.7 ms        0.056 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/8/1                          15.8 ms        0.081 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/16/1                         31.0 ms        0.154 ms          100
+bm_queue_mpmc<locking_queue<int>>/100000/24/1                         45.2 ms        0.214 ms          100
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/1        3.56 ms        0.027 ms         1000
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/2/1        17.6 ms        0.040 ms         1000
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/4/1         136 ms        0.060 ms          100
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/8/1        1396 ms        0.108 ms           10
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/16/1       6711 ms        0.193 ms            1
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/24/1      17955 ms        0.290 ms            1
+"""
+data_spmc = """
+interpret this results:
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/1                         7.35 m
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/2                         9.95 m
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/4                         18.5 m
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/8                         41.4 m
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/16                        41.9 m
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/24                        43.0 m
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/1                   1.97 m
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/2                   3.41 m
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/4                   16.1 ms        0.141 ms         1000
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/8                   11.5 ms        0.179 ms         1000
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/16                  32.3 ms        0.259 ms          100
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/24                  32.2 ms        0.336 ms          100
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/1                     7.38 ms        0.061 ms         1000
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/2                     9.05 ms        0.054 ms         1000
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/4                     25.4 ms        0.088 ms          100
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/8                     24.2 ms        0.132 ms         1000
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/16                    19.6 ms        0.209 ms         1000
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/24                    19.6 ms        0.280 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/1/1                          1.34 ms        0.029 ms        10000
+bm_queue_mpmc<locking_queue<int>>/100000/1/2                          3.48 ms        0.033 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/1/4                          6.74 ms        0.065 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/1/8                          12.5 ms        0.098 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/1/16                         21.3 ms        0.186 ms         1000
+bm_queue_mpmc<locking_queue<int>>/100000/1/24                         22.2 ms        0.274 ms         1000
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/1        3.32 ms        0.026 ms         1000
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/2        17.0 ms        0.037 ms         1000
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/4        14.7 ms        0.063 ms         1000
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/8         128 ms        0.105 ms          100
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/16        792 ms        0.200 ms           10
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/24       1097 ms        0.270 ms           10
+"""
 
-# Example usage
-def main():
-    """Example usage of the BenchmarkPlotter."""
-    
-    # Example: Load and visualize benchmark results
-    # plotter = BenchmarkPlotter('benchmark_results.json')
-    
-    # Or create sample data for demonstration
-    plotter = BenchmarkPlotter()
-    
-    # Sample data structure (replace with your actual JSON file)
-    sample_data = {
-        "benchmarks": [
-            {"name": "LockFreeQueue/threads:1", "real_time": 100, "cpu_time": 95, "time_unit": "ns", "iterations": 1000000, "threads": 1},
-            {"name": "LockFreeQueue/threads:2", "real_time": 60, "cpu_time": 110, "time_unit": "ns", "iterations": 1000000, "threads": 2},
-            {"name": "LockFreeQueue/threads:4", "real_time": 40, "cpu_time": 150, "time_unit": "ns", "iterations": 1000000, "threads": 4},
-            {"name": "LockFreeQueue/threads:8", "real_time": 35, "cpu_time": 250, "time_unit": "ns", "iterations": 1000000, "threads": 8},
-            {"name": "MutexQueue/threads:1", "real_time": 120, "cpu_time": 115, "time_unit": "ns", "iterations": 1000000, "threads": 1},
-            {"name": "MutexQueue/threads:2", "real_time": 150, "cpu_time": 280, "time_unit": "ns", "iterations": 1000000, "threads": 2},
-            {"name": "MutexQueue/threads:4", "real_time": 200, "cpu_time": 700, "time_unit": "ns", "iterations": 1000000, "threads": 4},
-            {"name": "MutexQueue/threads:8", "real_time": 300, "cpu_time": 2000, "time_unit": "ns", "iterations": 1000000, "threads": 8},
-        ]
-    }
-    
-    # Simulate loading sample data
-    plotter.raw_data = sample_data
-    plotter.data = pd.DataFrame(sample_data['benchmarks'])
-    plotter._parse_benchmark_names()
-    
-    # Generate comprehensive report
-    plotter.generate_report()
+# Parse the data
+benchmarks = {}
+for line in data.strip().splitlines():
+    match = re.match(r'bm_queue_mpmc<(.+?)>/\d+/\d+/(\d+)\s+([\d.]+) ms', line)
+    if match:
+        queue_type = match.group(1)
+        threads = int(match.group(2))
+        time_ms = float(match.group(3))
+        benchmarks.setdefault(queue_type, []).append((threads, time_ms))
 
-if __name__ == "__main__":
-    # Uncomment to run the example
-    # main()
-    
-    print("Benchmark Plotter ready!")
-    print("\nUsage:")
-    print("1. Export your Google Benchmark results to JSON:")
-    print("   ./your_benchmark --benchmark_format=json --benchmark_out=results.json")
-    print("\n2. Use the plotter:")
-    print("   plotter = BenchmarkPlotter('results.json')")
-    print("   plotter.generate_report()")
+# Plot
+plt.figure(figsize=(10,6))
+for queue_type, results in benchmarks.items():
+    results.sort(key=lambda x: x[0])
+    threads, times = zip(*results)
+    plt.plot(threads, times, marker='o', label=queue_type)
+
+plt.xlabel("Number of Threads")
+plt.ylabel("Time (ms)")
+plt.title("Google Benchmark: Queue Performance")
+plt.yscale("log")  # log scale because times vary a lot
+plt.grid(True, which="both", ls="--", linewidth=0.5)
+plt.legend()
+plt.tight_layout()
+plt.savefig("queue_benchmark.png", dpi=300)
