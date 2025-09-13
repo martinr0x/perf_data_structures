@@ -33,6 +33,7 @@ class locking_queue_with_circular_buffer {
 
   std::optional<T> try_get() {
     std::unique_lock<std::mutex> lock(mutex);
+    if(_size <= 0) return std::nullopt;
     if (_size <= _max_size) {
       const auto val = _data[read_idx];
 

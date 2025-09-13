@@ -1,7 +1,7 @@
 #include <atomic>
 #include <cstddef>
-#include <sys/resource.h>
 #include <memory>
+#include <sys/resource.h>
 #include <vector>
 
 // slot has an index and sequence num
@@ -17,9 +17,8 @@
 // fetch data, try increase idx, if succesful, return.
 template <typename T> class lockfree_queue_fixed {
   struct slot {
-    std::atomic<std::size_t> sequence_idx{size_t{0}};
-    T data = {};
-    slot()= default;
+    std::atomic<std::size_t> sequence_idx;
+    T data;
   };
 
 private:
@@ -31,9 +30,8 @@ private:
 
 public:
   lockfree_queue_fixed(size_t size = 100000)
-      :  _size{size}, write_idx{size_t{0}},
-        read_idx{size_t{0}} {
-      _data = std::make_unique<slot[]>(size);
+      : _size{size}, write_idx{size_t{0}}, read_idx{size_t{0}} {
+    _data = std::make_unique<slot[]>(size);
   }
 
   bool try_put(const T &value) {

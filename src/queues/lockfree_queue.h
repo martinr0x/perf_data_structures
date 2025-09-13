@@ -44,9 +44,6 @@ class lockfree_queue {
       auto expected{ref.load(std::memory_order::relaxed)};
 
       if (expected.empty) {
-        // std::cout << std::format("attempt to write at idx {}\n",
-        //                          curr_write_idx);
-
         if (ref.compare_exchange_weak(expected, desired,std::memory_order_release, std::memory_order_relaxed)) {
           write_idx = curr_write_idx + 1;
           return true;
