@@ -18,7 +18,7 @@ Includes comparisons against proven solutions (e.g., [moodycamel/concurrentqueue
   Lock-free queue using scanning + CAS. Limited to small data types.
 
 - **lockfree_queue_fixed**  
-  Lock-free queue with atomic read/write counters + slot sequencing. (Naming TBD.)
+  Lock-free queue with atomic read/write counters + slot sequencing.
 
 - **moodycamel**  
   Reference implementation; fast lock-free queue.
