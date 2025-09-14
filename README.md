@@ -2,8 +2,6 @@
 This is a **pet project** to learn and experiment with concurrent data structures.  
 Not production-ready — performance and correctness are the main focus.
 
-Includes comparisons against proven solutions (e.g., [moodycamel/concurrentqueue](https://github.com/cameron314/concurrentqueue)).
-
 ---
 
 ## Implemented Queues
@@ -21,7 +19,7 @@ Includes comparisons against proven solutions (e.g., [moodycamel/concurrentqueue
   Lock-free queue with atomic read/write counters + slot sequencing.
 
 - **moodycamel**  
-  Reference implementation; fast lock-free queue.
+  Open-source lock-free queue used as a reference (e.g., [moodycamel/concurrentqueue](https://github.com/cameron314/concurrentqueue)).
 
 ---
 
