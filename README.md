@@ -1,32 +1,53 @@
 # perf_data_structures
-Pet project to explore (concurrent) data structures and implement stuff on my own.
-Occasionally running some benchmarks against some proven solutions to see how well the stuff works
+This is a **pet project** to learn and experiment with concurrent data structures.  
+Not production-ready — performance and correctness are the main focus.
 
+Includes comparisons against proven solutions (e.g., [moodycamel/concurrentqueue](https://github.com/cameron314/concurrentqueue)).
 
-## Queues
-Implemented 4 different concurrent queues:
-* locking_queue: Unique lock for reading and writing
-* locking_queue_shared_mutex: RW lock + atomic read counter
-* lockfree_queue: Using scanning approach + CAS. Works only for small data types
-* lockfree_queue_fixed: Poor naming, uses atomic read/write counter + slot sequencing
-* moodycamel: Fast lockfree queue just used for comparison
+---
 
-### Benchmarks
-Ran on my 12-core Apple M4 PRO (ARM)
+## Implemented Queues
 
-#### Single Producer Multiple Consumer
-![alt text](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/spmc_results.png?raw=true)
-* locking_queue is so fast because its not fixed size, so inserts usually fit in L1 cache.
-* locking_queue_shared_mutex super slow because writer starves due to unique lock access, readers rarely give up shared lock
-#### Multiple Producer Single Consumer
-![alt text](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/mpsc_results.png?raw=true)
-* Moodycamel is so much faster because it can dynamically grow, and does not wait until consumer took values from the queue.
-* Same for locking_queue
+- **locking_queue**  
+  Simple queue with a unique lock for reads/writes.
 
-### Future work
-* Dynamically growing lookfree queue
-* Reduce contention on lockfree_queue_fixed with sharding scheme
+- **locking_queue_shared_mutex**  
+  RW lock + atomic read counter. Allows concurrent reads but suffers from writer starvation.
 
+- **lockfree_queue**  
+  Lock-free queue using scanning + CAS. Limited to small data types.
 
+- **lockfree_queue_fixed**  
+  Lock-free queue with atomic read/write counters + slot sequencing. (Naming TBD.)
 
+- **moodycamel**  
+  Reference implementation; fast lock-free queue.
 
+---
+
+## Benchmarks
+
+Environment: **Apple M4 Pro (12 cores, ARM)**  
+
+### Single Producer, Multiple Consumers (SPMC)
+![SPMC Results](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/spmc_results.png?raw=true)
+
+- `locking_queue` appears very fast due to non-fixed size (fits in L1 cache).  
+- `locking_queue_shared_mutex` is slow: writer starves because consumers rarely release shared locks.
+
+---
+
+### Multiple Producers, Single Consumer (MPSC)
+![MPSC Results](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/mpsc_results.png?raw=true)
+
+- `moodycamel` outperforms others due to dynamic growth and non-blocking inserts.  
+- `locking_queue` benefits similarly from dynamic resizing.
+
+---
+
+## Future Work
+
+- Lock-free queue with dynamic growth.  
+- Sharded design for `lockfree_queue_fixed` to reduce contention.  
+
+---
