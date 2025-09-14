@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import re
 
 # Raw benchmark data
-data = """
+data_mpsc = """
 bm_queue_mpmc<lockfree_queue<int>>/100000/1/1                         7.37 ms        0.041 ms         1000
 bm_queue_mpmc<lockfree_queue<int>>/100000/2/1                         20.4 ms        0.048 ms         1000
 bm_queue_mpmc<lockfree_queue<int>>/100000/4/1                         61.4 ms        0.072 ms          100
@@ -35,37 +35,36 @@ bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/16/1       6711 ms   
 bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/24/1      17955 ms        0.290 ms            1
 """
 data_spmc = """
-interpret this results:
-bm_queue_mpmc<lockfree_queue<int>>/100000/1/1                         7.35 m
-bm_queue_mpmc<lockfree_queue<int>>/100000/1/2                         9.95 m
-bm_queue_mpmc<lockfree_queue<int>>/100000/1/4                         18.5 m
-bm_queue_mpmc<lockfree_queue<int>>/100000/1/8                         41.4 m
-bm_queue_mpmc<lockfree_queue<int>>/100000/1/16                        41.9 m
-bm_queue_mpmc<lockfree_queue<int>>/100000/1/24                        43.0 m
-bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/1                   1.97 m
-bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/2                   3.41 m
-bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/4                   16.1 ms        0.141 ms         1000
-bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/8                   11.5 ms        0.179 ms         1000
-bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/16                  32.3 ms        0.259 ms          100
-bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/24                  32.2 ms        0.336 ms          100
-bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/1                     7.38 ms        0.061 ms         1000
-bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/2                     9.05 ms        0.054 ms         1000
-bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/4                     25.4 ms        0.088 ms          100
-bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/8                     24.2 ms        0.132 ms         1000
-bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/16                    19.6 ms        0.209 ms         1000
-bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/24                    19.6 ms        0.280 ms         1000
-bm_queue_mpmc<locking_queue<int>>/100000/1/1                          1.34 ms        0.029 ms        10000
-bm_queue_mpmc<locking_queue<int>>/100000/1/2                          3.48 ms        0.033 ms         1000
-bm_queue_mpmc<locking_queue<int>>/100000/1/4                          6.74 ms        0.065 ms         1000
-bm_queue_mpmc<locking_queue<int>>/100000/1/8                          12.5 ms        0.098 ms         1000
-bm_queue_mpmc<locking_queue<int>>/100000/1/16                         21.3 ms        0.186 ms         1000
-bm_queue_mpmc<locking_queue<int>>/100000/1/24                         22.2 ms        0.274 ms         1000
-bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/1        3.32 ms        0.026 ms         1000
-bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/2        17.0 ms        0.037 ms         1000
-bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/4        14.7 ms        0.063 ms         1000
-bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/8         128 ms        0.105 ms          100
-bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/16        792 ms        0.200 ms           10
-bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/24       1097 ms        0.270 ms           10
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/1                         7.67 ms        0.047 ms         1000 
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/2                         9.64 ms        0.045 ms         1000 
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/4                         17.5 ms        0.064 ms         1000 
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/8                         41.3 ms        0.095 ms          100 
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/16                        43.0 ms        0.162 ms          100 
+bm_queue_mpmc<lockfree_queue<int>>/100000/1/24                        43.1 ms        0.226 ms          100 
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/1                   2.13 ms        0.102 ms         6942 
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/2                   3.46 ms        0.093 ms         1000 
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/4                   15.0 ms        0.145 ms         1000 
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/8                   11.6 ms        0.177 ms         1000 
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/16                  30.4 ms        0.249 ms          100 
+bm_queue_mpmc<lockfree_queue_fixed<int>>/100000/1/24                  30.4 ms        0.336 ms          100 
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/1                     7.48 ms        0.061 ms         1000 
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/2                     9.22 ms        0.054 ms         1000 
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/4                     24.2 ms        0.096 ms         1000 
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/8                     24.4 ms        0.132 ms         1000 
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/16                    19.6 ms        0.211 ms         1000 
+bm_queue_mpmc<moodycamel_wrapper<int>>/100000/1/24                    19.7 ms        0.278 ms         1000 
+bm_queue_mpmc<locking_queue<int>>/100000/1/1                          1.39 ms        0.031 ms        10000 
+bm_queue_mpmc<locking_queue<int>>/100000/1/2                          3.48 ms        0.033 ms         1000 
+bm_queue_mpmc<locking_queue<int>>/100000/1/4                          6.72 ms        0.064 ms         1000 
+bm_queue_mpmc<locking_queue<int>>/100000/1/8                          12.6 ms        0.096 ms         1000 
+bm_queue_mpmc<locking_queue<int>>/100000/1/16                         21.3 ms        0.186 ms         1000 
+bm_queue_mpmc<locking_queue<int>>/100000/1/24                         21.9 ms        0.275 ms         1000 
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/1        3.53 ms        0.026 ms         1000 
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/2        17.5 ms        0.036 ms         1000 
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/4        14.6 ms        0.063 ms         1000 
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/8         126 ms        0.106 ms          100 
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/16        873 ms        0.200 ms           10 
+bm_queue_mpmc<locking_queue_with_shared_mutex<int>>/100000/1/24       1210 ms        0.262 ms           10 
 """
 
 # Parse the data
