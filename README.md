@@ -40,8 +40,7 @@ Environment: **Apple M4 Pro (12 cores, ARM)**
 ### Multiple Producers, Single Consumer (MPSC)
 ![MPSC Results](https://github.com/martinr0x/perf_data_structures/blob/master/benchmarks/mpsc_results.png?raw=true)
 
-- `moodycamel` outperforms others due to dynamic growth and non-blocking inserts.  
-- `locking_queue` benefits similarly from dynamic resizing.
+- `moodycamel` & `locking_queue` outperforms others because they do not have a size limit. Therefore they can continue to put elements into the queue. 
 
 ---
 
